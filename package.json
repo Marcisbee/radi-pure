@@ -1,0 +1,19 @@
+{
+  "name": "radi-pure",
+  "version": "0.0.1",
+  "description": "",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Marcisbee/radi-pure.git"
+  },
+  "author": "Marcis Bergmanis <marcisbergmanis@gmail.com>",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Marcisbee/radi-pure/issues"
+  },
+  "homepage": "https://github.com/Marcisbee/radi-pure#readme"
+}
