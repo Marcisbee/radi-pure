@@ -4,7 +4,10 @@
   "description": "",
   "main": "src/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "npm run roll-js",
+    "roll-es": "rollup -c -n RadiExperiment -f es -i src/index.js -o dist/radi.es.js -m",
+    "roll-js": "rollup -c -n RadiExperiment -f umd -i src/index.js -o dist/radi.js -m"
   },
   "repository": {
     "type": "git",
@@ -15,5 +18,10 @@
   "bugs": {
     "url": "https://github.com/Marcisbee/radi-pure/issues"
   },
-  "homepage": "https://github.com/Marcisbee/radi-pure#readme"
+  "homepage": "https://github.com/Marcisbee/radi-pure#readme",
+  "dependencies": {},
+  "devDependencies": {
+    "rollup-plugin-buble": "^0.19.2",
+    "rollup-plugin-node-resolve": "^3.4.0"
+  }
 }

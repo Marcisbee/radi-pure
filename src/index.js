@@ -1,16 +1,31 @@
 const RadiExperiment = (function() {
   const version = '0.0.1';
 
+  function flatten(arr) {
+    let i = 0;
+    while (i < arr.length) {
+      Array.isArray(arr[i]) && arr.splice(i, 1, ...arr[i]) || i++;
+    }
+    return arr;
+  }
+
+  function fireEvent(type, node) {
+    const onEvent = document.createEvent('Event');
+    onEvent.initEvent(type, true, true);
+
+    if (typeof node.dispatchEvent === 'function') {
+      node._eventFired = true;
+      node.dispatchEvent(onEvent);
+    }
+    return node;
+  }
+
   function isNode(node) {
     return node instanceof Node;
   }
 
-  const insertAfter = function (newNode, referenceNode, $parent) {
+  function insertAfter(newNode, referenceNode, $parent) {
     if (!$parent) $parent = referenceNode.parentNode;
-
-    if (arguments.length < 2) {
-      throw (new TypeError("Failed to execute 'insertAfter' on 'Node': 2 arguments required, but only " + arguments.length + " present."));
-    }
 
     if (isNode(newNode)) {
       if (referenceNode === null || referenceNode === undefined) {
@@ -20,18 +35,14 @@ const RadiExperiment = (function() {
       if (isNode(referenceNode)) {
         return $parent.insertBefore(newNode, referenceNode.nextSibling);
       }
-
-      throw (new TypeError("Failed to execute 'insertAfter' on 'Node': parameter 2 is not of type 'Node'."));
     }
-
-    throw (new TypeError("Failed to execute 'insertAfter' on 'Node': parameter 1 is not of type 'Node'."));
   };
 
   function h(type, props, ...children) {
     if (typeof type === 'number') {
       type = type + '';
     }
-    return { type, props: props || {}, children };
+    return { type, props: props || {}, children: flatten(children) };
   }
 
   function setBooleanProp($target, name, value) {
@@ -61,7 +72,9 @@ const RadiExperiment = (function() {
   }
 
   function setProp($target, name, value) {
-    if (isCustomProp(name)) {
+    if (name === 'style') {
+      setStyles($target, value);
+    } else if (isCustomProp(name)) {
       return;
     } else if (name === 'className') {
       $target.setAttribute('class', value);
@@ -82,6 +95,12 @@ const RadiExperiment = (function() {
     } else {
       $target.removeAttribute(name);
     }
+  }
+
+  function setStyles($target, styles) {
+    Object.keys(styles).forEach(name => {
+      $target.style[name] = styles[name];
+    })
   }
 
   function setProps($target, props) {
@@ -116,155 +135,200 @@ const RadiExperiment = (function() {
     });
   }
 
+  function capitalise(lower) {
+    return lower.charAt(0).toUpperCase() + lower.substr(1);
+  }
+
+  function changed(node1, node2) {
+    if (node1 === undefined || node2 === undefined) return false;
+    if (typeof node1 !== typeof node2) return true;
+    if ((typeof node1 === 'string' || typeof node1 === 'number')
+      && node1 !== node2) return true;
+    if (node1.type !== node2.type) return true;
+    if (node1.props && node1.props.forceUpdate) return true;
+
+    return false;
+  }
+
+  function nodeDestroyer(node) {
+    fireEvent('destroy', node);
+
+    if (node.nodeType === 1) {
+      var curChild = node.firstChild;
+      while (curChild) {
+        nodeDestroyer(curChild);
+        curChild = curChild.nextSibling;
+      }
+    }
+  }
+
   function createElement(node, $parent) {
-    if (typeof node === 'string' || typeof node === 'number' || (typeof node === 'boolean' && node) || node instanceof Date) {
+    if (typeof node === 'string' || typeof node === 'number') {
       return document.createTextNode(node);
     }
 
-    if (!node) {
-      return null;
+    if (node === undefined || node === false || node === null) {
+      return document.createComment('');
     }
 
-    if (node.type === 'store') {
-      node.props($parent);
-      return null;
+    if (Array.isArray(node)) {
+      const $pointer = document.createTextNode('');
+
+      $pointer.addEventListener('mount', () => {
+        for (var i = 0; i < node.length; i++) {
+          mount(node[i], $parent);
+        }
+      })
+
+      return $pointer;
     }
 
-    if (typeof node === 'object'
-      && !(node.type
-        && node.props
-        && node.children)) {
-      // return document.createTextNode(JSON.stringify(node));
-      return document.createTextNode((node));
-    }
-
-    if (typeof node.type === 'function') {
-
-      let lifecycles = {
-        onMount: () => { },
+    if (typeof node === 'function' || typeof node.type === 'function') {
+      const fn = node.type || node;
+      const lifecycles = {
+        __$events: {},
+        onMount: () => {},
+        on: (event, fn) => {
+          const e = lifecycles.__$events;
+          const name = 'on' + capitalise(event);
+          if (!e[name]) e[name] = [];
+          e[name].push(fn);
+        },
+        trigger: (event, ...args) => {
+          const name = 'on' + capitalise(event);
+          (lifecycles.__$events[name] || [])
+            .map(e => e(...args));
+          if (typeof lifecycles[name] === 'function') {
+            lifecycles[name](...args);
+          }
+        }
       }
 
-      let $element = createElement(node.type.call(lifecycles, { ...node.props, children: node.children }), $parent);
+      const $element = createElement(
+        fn.call(lifecycles, {
+          ...(node.props || {}),
+          children: node.children || [],
+        }),
+        $parent
+      );
 
-      $element.onMount = () => {
-        lifecycles.onMount();
-        return $element;
-      };
+      if ($element && typeof $element.addEventListener === 'function') {
+        $element.addEventListener('mount', () => {
+          lifecycles.trigger('mount', $element, $parent);
+        }, {
+          passive: true,
+          once: true,
+        }, false)
+
+        $element.addEventListener('destroy', (e) => {
+          lifecycles.trigger('destroy', $element, $parent);
+        }, {
+          passive: true,
+          once: true,
+        }, false)
+      }
 
       return $element;
     }
 
-    const $el = document.createElement(node.type);
-    let $lastEl = null;
-    setProps($el, node.props);
-    addEventListeners($el, node.props);
-    const applyChildren = $el => n => {
-      const $n = createElement(n, $el);
-      if ($n) {
-        if (Array.isArray(n)) {
-          n.map(applyChildren($el));
-        } else
-        if ($lastEl) {
-          insertAfter($n, $lastEl, $el);
-        } else {
-          $el.appendChild.call($el, $n);
+    if (typeof node === 'object') {
+      if (node.type) {
+        const $el = document.createElement(node.type);
+        let $lastEl = null;
+        setProps($el, node.props);
+        addEventListeners($el, node.props);
+        const applyChildren = $el => n => {
+          const $n = createElement(n, $el);
+          if ($n) {
+            // if (Array.isArray(n)) {
+            //   n.map(applyChildren($el));
+            // } else
+            if ($lastEl) {
+              insertAfter($n, $lastEl, $el);
+            } else {
+              $el.appendChild.call($el, $n);
+              fireEvent('mount', $n);
+            }
+          }
         }
-        if (typeof $n.onMount === 'function') $n.onMount();
+        node.children.map(applyChildren($el));
+        return $el;
       }
+      return createElement(JSON.stringify(node), $parent);
     }
-    node.children.map(applyChildren($el));
-    return $el;
+
+    console.error('Unhandled node', node)
   }
 
-  function changed(node1, node2) {
-    return typeof node1 !== typeof node2 ||
-      (
-        (typeof node1 === 'string' || typeof node1 === 'number')
-        && node1 !== node2) ||
-      node1.type !== node2.type ||
-      node1.props && node1.props.forceUpdate;
+  function ensureArray(a) {
+    if (arguments.length === 0) return [];
+    if (arguments.length === 1) {
+      if (a === undefined || a === null) return [];
+      if (Array.isArray(a)) return a;
+    }
+    return Array.prototype.slice.call(arguments);
   }
 
-  function updateElement($parent, newNode, oldNode, index = 0) {
-    let $output = $parent.childNodes[index];
-    if (newNode instanceof Date) newNode = newNode.toString();
-    if (!oldNode && typeof oldNode !== 'number' && typeof oldNode !== 'string') {
-      $parent.appendChild(
-        $output = createElement(newNode, $parent)
-      );
-      if ($output && typeof $output.onMount === 'function') $output.onMount();
-    } else if (!newNode && typeof newNode !== 'number' && typeof newNode !== 'string') {
-      $parent.removeChild(
-        $parent.childNodes[index]
-      );
-    } else if (changed(newNode, oldNode)) {
-      $parent.replaceChild(
-        $output = createElement(newNode, $parent),
-        $parent.childNodes[index]
-      );
-      if ($output && typeof $output.onMount === 'function') $output.onMount();
-    } else if (newNode.type) {
-      updateProps(
-        $parent.childNodes[index],
-        newNode.props,
-        oldNode.props
-      );
-      const newLength = newNode.children.length;
-      const oldLength = oldNode.children.length;
-      for (let i = 0; i < newLength || i < oldLength; i++) {
-        updateElement(
-          $parent.childNodes[index],
-          newNode.children[i],
-          oldNode.children[i],
-          i
+  function updateElement($parent, newNode, oldNode, index = 0, $pointer) {
+    let $output = $parent && $parent.childNodes[index];
+    if ($pointer) {
+      index = Array.prototype.indexOf.call($parent.childNodes, $pointer) + 1;
+    }
+
+    const normalNewNode = flatten(ensureArray(newNode));
+    const normalOldNode = flatten(ensureArray(oldNode));
+    const newLength = normalNewNode.length;
+    const oldLength = normalOldNode.length;
+
+    for (let i = 0; i < newLength || i < oldLength; i++) {
+      if (normalNewNode[i] instanceof Date) normalNewNode[i] = normalNewNode[i].toString();
+      if (normalOldNode[i] === false || normalOldNode[i] === undefined || normalOldNode[i] === null) {
+        $output = createElement(normalNewNode[i], $parent);
+        if ($pointer) {
+          insertAfter($output, $parent.childNodes[(index + i - 1)], $parent);
+        } else {
+          $parent.appendChild($output);
+        }
+        fireEvent('mount', $output);
+      } else
+      if (normalNewNode[i] === false || normalNewNode[i] === undefined || normalNewNode[i] === null) {
+        const $target = $parent.childNodes[index];
+        if ($target) {
+          $parent.removeChild($target);
+          nodeDestroyer($target);
+        }
+      } else
+      if (changed(normalNewNode[i], normalOldNode[i])) {
+        $parent.replaceChild(
+          $output = createElement(normalNewNode[i], $parent),
+          $parent.childNodes[index + i]
         );
+        fireEvent('mount', $output);
+      } else if (typeof normalNewNode[i].type === 'string') {
+        const childNew = normalNewNode[i];
+        const childOld = normalOldNode[i];
+        updateProps(
+          $parent.childNodes[index + i],
+          childNew.props,
+          childOld.props
+        );
+        const newLength2 = childNew.children.length;
+        const oldLength2 = childOld.children.length;
+        for (let n = 0; n < newLength2 || n < oldLength2; n++) {
+          updateElement(
+            $parent.childNodes[index + i],
+            childNew.children[n],
+            childOld.children[n],
+            n
+          );
+        }
       }
     }
-    return $output;
+
+    return normalNewNode;
   }
 
-  // const portal = (render) => {
-  //   let $parent;
-  //   let $current;
-  //   let index = 0;
-  //   let newTree;
-  //   let oldTree;
-
-  //   const newContent = render((content) => {
-  //     $current = updateElement($parent, newTree, oldTree, index);
-  //     // console.log({$parent, newTree, oldTree, index, $current});
-  //     index = Array.prototype.indexOf.call($current.parentNode.childNodes, $current);
-  //     oldTree = newTree;
-  //   });
-
-  //   // subscriptions.push((state, ...args) => {
-  //   //   newTree = fn(state);
-  //   //   $current = updateElement($parent, newTree, oldTree, index);
-  //   //   // console.log({$parent, newTree, oldTree, index, $current});
-  //   //   index = Array.prototype.indexOf.call($current.parentNode.childNodes, $current);
-  //   //   oldTree = newTree;
-  //   // });
-  //   return {
-  //     type: 'portal',
-  //     props: ($newParent) => {
-  //       $parent = $newParent;
-  //       $current = updateElement($parent, newTree, null, 0);
-  //       index = Array.prototype.indexOf.call($current.parentNode.childNodes, $current);
-  //       oldTree = newTree;
-  //     },
-  //   };
-  // }
-
-  // portal((passContent) => {
-  //   store.subscribe(state => {
-  //     passContent(<h1>Hello { state.count }</h1>);
-  //   });
-
-  // })
-
-  const mount = (component, container) => {
-    // let node = patch(null, component(), container);
-
+  function mount(component, container) {
     return {
       component: component,
       node: updateElement(container, component),
@@ -272,26 +336,9 @@ const RadiExperiment = (function() {
         return updateElement(container, null);
       },
     };
-
-    // component.subscribe((render) => {
-    //   console.log('->');
-    //   node = patch(node, render(), container);
-    // });
   };
 
-  // mount(myApp, app);
-
-
-
-
-
-  // const {
-  //   dispatch,
-  //   listen,
-  //   store,
-  // } = Radi;
-
-  function Store(state) {
+  function Store(state = {}) {
     let subscriptions = [];
 
     let STORE = {
@@ -321,33 +368,36 @@ const RadiExperiment = (function() {
         //   args: args,
         //   payload,
         // });
-        console.log('dispatch', fn.name, payload);
+        // console.log('dispatch', fn.name, payload);
         return this.update(payload);
       },
-      render: function (fn) {
+      render: function (fn = (state) => JSON.stringify(state)) {
         let $parent;
+        let $pointer;
         let $current;
-        let index = 0;
         let newTree;
         let oldTree;
 
-        subscriptions.push((state, ...args) => {
+        function update(state) {
           newTree = fn(state);
-          $current = updateElement($parent, newTree, oldTree, index);
-          // console.log({$parent, newTree, oldTree, index, $current});
-          index = Array.prototype.indexOf.call($current.parentNode.childNodes, $current);
+          $current = updateElement($parent, newTree, oldTree, 0, $pointer);
           oldTree = newTree;
+        }
+
+        subscriptions.push((state, ...args) => {
+          update(state);
         });
-        return {
-          type: 'store',
-          props: ($newParent) => {
-            $parent = $newParent;
-            newTree = fn(STORE);
-            $current = updateElement($parent, newTree, null, 0);
-            index = Array.prototype.indexOf.call($current.parentNode.childNodes, $current);
-            oldTree = newTree;
-          },
+
+        function item() {
+          this.onMount = (element, parent) => {
+            $pointer = element;
+            $parent = parent || element.parentNode;
+            update(STORE);
+          }
+          return '';
         };
+
+        return item;
       },
       map: function(fn) {
         const mapped = new Store(fn(STORE));

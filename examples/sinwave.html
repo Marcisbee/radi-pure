@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Radi sinwave</title>
+  <style>
+    .animated-sin-wave {
+      position: relative;
+      height: 150px;
+      width: 100%;
+      overflow: hidden;
+    }
+
+    .animated-sin-wave > .bar {
+      position: absolute;
+      height: 100%;
+      border-radius: 50%;
+      max-width: 10px;
+      transform: scale(0.8,.5) translateY(0%) rotate(0deg)
+    }
+
+    .animated-sin-wave-description {
+      width: 100%;
+      text-align: center;
+      font-size: 0.8em;
+      color: #747678;
+      padding: 2em;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://unpkg.com/@babel/standalone@7.0.0/babel.min.js"></script>
+  <script src="../src/index.js"></script>
+  <script>
+    const rand = Math.random
+
+    function buildData(count, start) {
+      start = (start) ? start : 0;
+      const adjectives = [
+        "pretty",
+        "large",
+        "big",
+        "small",
+        "tall",
+        "short",
+        "long",
+        "handsome",
+        "plain",
+        "quaint",
+        "clean",
+        "elegant",
+        "easy",
+        "angry",
+        "crazy",
+        "helpful",
+        "mushy",
+        "odd",
+        "unsightly",
+        "adorable",
+        "important",
+        "inexpensive",
+        "cheap",
+        "expensive",
+        "fancy",
+      ]
+
+      const colours = [
+        "red",
+        "yellow",
+        "blue",
+        "green",
+        "pink",
+        "brown",
+        "purple",
+        "brown",
+        "white",
+        "black",
+        "orange",
+      ]
+
+      const nouns = [
+        "table",
+        "chair",
+        "house",
+        "bbq",
+        "desk",
+        "car",
+        "pony",
+        "cookie",
+        "sandwich",
+        "burger",
+        "pizza",
+        "mouse",
+        "keyboard",
+      ]
+
+      var i = start + 1;
+      return new Array(count).fill(0).map(_ => ({ id: i++, value: `${adjectives[
+        rand() * 1000 % adjectives.length >> 0]} ${colours[
+        rand() * 1000 % colours.length >> 0]} ${nouns[
+        rand() * 1000 % nouns.length >> 0]}`
+      }))
+    }
+
+  </script>
+  <script type="text/babel">
+    /* @jsx h */
+    const { h, mount, Store } = RadiExperiment;
+
+    const store = new Store({
+      rows: [],
+    })
+
+    const create = (state, count) => {
+      return {
+        rows: buildData(count, 0),
+      }
+    }
+
+    const remove = ({rows}, count) => {
+      return {
+        rows: count ? rows.slice(0,count) : [],
+      }
+    }
+
+    const every = ({rows}, interval) => {
+      return {
+        rows: rows.map((r, i) => (
+          !((i + 1) % interval)
+            ? { ...r, value: r.value + ' !!!' }
+            : r
+        )),
+      }
+    }
+
+    const swap = ({rows}, from, to) => {
+      const temp1 = {...(rows.slice(from, from+1)[0])}
+      const temp2 = {...(rows.slice(to, to+1)[0])}
+      rows[from] = temp2;
+      rows[to] = temp1;
+      return {
+        rows,
+      }
+    }
+
+    const reverse = ({rows}) => {
+      return {
+        rows: rows.reverse(),
+      }
+    }
+
+    const App = function() {
+      return (
+        <div>
+          <h1 style={{color: 'red'}}>Hello World</h1>
+          <button onclick={ e => store.dispatch(create, 1) }>Create 1</button>
+          <button onclick={ e => store.dispatch(create, 1000) }>Create 1k</button>
+          <button onclick={ e => store.dispatch(create, 10000) }>Create 10k</button>
+          <button onclick={ e => store.dispatch(reverse) }>reverse</button>
+          <button onclick={ e => store.dispatch(every, 10) }>every 10</button>
+          <button onclick={ e => store.dispatch(swap, 4, 9) }>swap 4,9</button>
+          <button onclick={ e => store.dispatch(remove) }>remove</button>
+          <ul>
+            {store.render(v => v.rows.map((item,n) => <li>{item.id}. {item.value}</li>))}
+          </ul>
+        </div>
+      )
+    }
+
+
+
+
+
+    const sinwave = new Store({
+      barWidth: 1,
+      barCount: 100,
+      active: false,
+      count: 0,
+      step: 0.5,
+      translateY: 0,
+      rotation: 0,
+      bars: [],
+    })
+
+    const getColors = ({barCount, count}) => {
+      let arr = [];
+      for (var i = 0; i < barCount; i++) {
+        var hue = (360 / barCount * i - count) % 360;
+        var t = Math.sin(count/10 + i/5) * 100 * .5;
+        var r = (count+i)%360;
+        arr.push({
+          id: i,
+          color: 'hsl(' + hue + ',95%,55%)',
+          translateY: t,
+          rotation: r,
+        });
+      }
+      return arr;
+    }
+
+    const sinwaveTick = (state) => {
+      if (state.active) {
+        window.requestAnimationFrame(() => {
+          sinwave.dispatch(sinwaveTick);
+        });
+        return {
+          bars: getColors(state),
+          count: state.count + state.step,
+        }
+      }
+      return {}
+    }
+
+    const start = () => ({
+      active: true,
+    })
+
+    const stop = () => ({
+      active: false,
+    })
+
+    function Sinwave() {
+      return (
+        <div>
+          <div class="animated-sin-wave">
+            {sinwave.render((state) => (
+              state.bars.map((bar, i) => <div class="bar" style={{
+                width: state.barWidth + '%',
+                left: ( state.barWidth * i ) + '%',
+                transform: 'scale(0.8,.5) translateY(' + bar.translateY + '%) rotate(' + bar.rotation + 'deg)',
+                backgroundColor: bar.color,
+              }}></div>)
+            ))}
+          </div>
+          <button onclick={e => (
+            sinwave.dispatch(start),
+            sinwave.dispatch(sinwaveTick)
+          )}>Start</button>
+        </div>
+      )
+    }
+
+    mount(
+      // Counter,
+      <Sinwave/>,
+      // <Counter/>,
+      // <h1><Counter/></h1>,
+      // <h2>Hello World</h2>,
+      // [1,2,3],
+      // [1, clock.render(v => [2, v.time, 3]), 4],
+      app
+    );
+
+
+
+    // function ensureArray(a) {
+    //   if (arguments.length === 0) return [];            // no args, ret []
+    //   if (arguments.length === 1) {                     // single argument
+    //     if (a === undefined || a === null) return [];   // undefined or null, ret []
+    //     if (Array.isArray(a)) return a;                 // isArray, return it
+    //   }
+    //   return Array.prototype.slice.call(arguments);     // return array with copy of all arguments
+    // }
+    //
+    //
+    // function text(string) {
+    //   return document.createTextNode(string);
+    // }
+    //
+    // function updateElement(newNode, oldNode, $pointer) {
+    //
+    // }
+    //
+    // function changed(node1, node2) {
+    //   return typeof node1 !== typeof node2 ||
+    //     (
+    //       (typeof node1 === 'string' || typeof node1 === 'number')
+    //       && node1 !== node2) ||
+    //     node1.type !== node2.type ||
+    //     node1.props && node1.props.forceUpdate;
+    // }
+    //
+    // function patch(newNode, oldNode, $parent, index = 0, $pointer) {
+    //   if ($pointer) {
+    //     index = Array.prototype.indexOf.call($parent.childNodes, $pointer) + 1;
+    //   }
+    //   const normalNewNode = ensureArray(newNode || []);
+    //   const normalOldNode = ensureArray(oldNode || []);
+    //   const newLength = normalNewNode.length;
+    //   const oldLength = normalOldNode.length;
+    //
+    //   for (let i = 0; i < newLength || i < oldLength; i++) {
+    //     if (!normalOldNode[i]) {
+    //       $parent.appendChild(
+    //         text(normalNewNode[i])
+    //       )
+    //     } else
+    //     if (!normalNewNode[i]) {
+    //       $parent.removeChild(
+    //         $parent.childNodes[index]
+    //       )
+    //     } else if (changed(newNode, oldNode)) {
+    //       $parent.replaceChild(
+    //         text(normalNewNode[i]),
+    //         $parent.childNodes[index + i]
+    //       );
+    //     }
+    //     // updateElement(normalNewNode[i], normalOldNode[i], $pointer);
+    //     console.log(i, {new: normalNewNode[i], old: normalOldNode[i], $pointer})
+    //   }
+    //
+    //   console.log({normalNewNode, normalOldNode})
+    // }
+    //
+    // const pointer = bbb.appendChild(text('[pointer]'))
+    //
+    // patch([1,2,3], [], bbb, 0, pointer)
+    // patch(null, [1,2,3], bbb, 0, pointer)
+
+  </script>
+</body>
+</html>
