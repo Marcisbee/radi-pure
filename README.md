@@ -83,6 +83,53 @@ function App() {
 }
 ```
 
+## More about state management `.Store` & `.Fetch`
+
+Also one truly annoying thing is to manage data coming from API, passing it to dozens of components. Intention is to eliminate this hustle.
+
+What if you could just write your Schema for API calls and include it in your state and update it in any part of your app.
+
+```jsx
+// First we define Schema for our data from API
+const User = new Fetch.get(
+  '/users/:id',
+  (data) => ({
+    id: data._key,
+    firstname: data.firstname,
+    lastname: data.lastname,
+  })
+)
+
+// Then we create store where we include our User Schema
+const userStore = new Store({
+  foo: 'bar',
+  user: User({id: 10}),
+})
+
+// This part is not necessary, but for demo purpose it's here
+// Here we inject `userStore` store into another store
+const appStore = new Store({
+  person: {
+    fakeAge: 21,
+    data: userStore.inject,
+  }
+})
+
+// Finally we can use our data. API will gather data automatically
+function App() {
+  return (
+    <h1>
+      {appState.render(({person}) => (
+        person.data.firstname + ' ' + person.data.lastname
+      ))}
+    </h1>
+  )
+}
+```
+
+It's possible to add store inside of another store and same for API returned data
+
+
 ## Stay In Touch
 
 - [Twitter](https://twitter.com/radi_js)
