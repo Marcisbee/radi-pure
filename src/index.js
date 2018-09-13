@@ -300,6 +300,7 @@ const RadiExperiment = (function() {
     const newLength = normalNewNode.length;
     const oldLength = normalOldNode.length;
 
+    let modifier = 0;
     for (let i = 0; i < newLength || i < oldLength; i++) {
       if (normalNewNode[i] instanceof Date) normalNewNode[i] = normalNewNode[i].toString();
       if (normalOldNode[i] === false || normalOldNode[i] === undefined || normalOldNode[i] === null) {
@@ -312,10 +313,11 @@ const RadiExperiment = (function() {
         fireEvent('mount', $output);
       } else
       if (normalNewNode[i] === false || normalNewNode[i] === undefined || normalNewNode[i] === null) {
-        const $target = $parent.childNodes[index];
+        const $target = $parent.childNodes[index + i + modifier];
         if ($target) {
           $parent.removeChild($target);
           nodeDestroyer($target);
+          modifier -= 1;
         }
       } else
       if (changed(normalNewNode[i], normalOldNode[i])) {
