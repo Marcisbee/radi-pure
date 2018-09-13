@@ -6,6 +6,12 @@
   <meta http-equiv="X-UA-Compatible" content="ie=edge">
   <title>Radi sinwave</title>
   <style>
+    body {
+      font-family: Arial;
+    }
+    * {
+      box-sizing: border-box;
+    }
     .animated-sin-wave {
       position: relative;
       height: 150px;
@@ -109,11 +115,303 @@
   </script>
   <script type="text/babel">
     /* @jsx h */
-    const { h, mount, Store } = RadiExperiment;
+
+
+    function devTools(_radi) {
+      const { h } = _radi;
+
+      const dev = new _radi.Store({
+        stores: [],
+        actions: [],
+        active: 0,
+      })
+      const storeHolder = {};
+
+      const setActive = ({actions, stores, active}, newActive) => {
+        let inBetweenActions = actions.slice(newActive, active);
+        let originals = actions
+          .slice(0, newActive)
+          .reduce(
+            (acc, act) => (acc[act.store] = (acc[act.store] || []).concat(act.payload),acc),
+            {}
+          );
+
+        for (var i = 0; i < stores.length; i++) {
+          if (typeof originals[stores[i]] !== 'undefined') {
+            storeHolder[stores[i]].update(
+              Object.assign(
+                storeHolder[stores[i]].getInitial(),
+                ...originals[stores[i]]
+              )
+            );
+          } else {
+            for (var n = 0; n < inBetweenActions.length; n++) {
+              if (stores[i] === inBetweenActions[n].store) {
+                storeHolder[stores[i]].update(
+                  Object.assign(
+                    storeHolder[stores[i]].getInitial(),
+                    inBetweenActions[n].payload
+                  )
+                );
+                break;
+              }
+            }
+          }
+        }
+
+        return { active: newActive };
+      }
+      const next = ({actions, active}) => {
+        const go = actions.reduce((acc, nn, ii) => nn.index === active ? ii + 1 : acc, 0) + 1;
+        if (go <= actions.length) {
+          dev.dispatch(setActive, go);
+        }
+      }
+      const previous = ({actions, active}) => {
+        const go = actions.reduce((acc, nn, ii) => nn.index === active ? ii + 1 : acc, 0) - 1;
+        if (go > 0) {
+          dev.dispatch(setActive, go);
+        }
+      }
+      const addStore = ({stores}, newStore) => ({stores: stores.concat(newStore)})
+      const addAction = ({actions, active}, newAction) => {
+        const lastIndex = actions.length && actions[actions.length - 1].index || 0;
+        let actionSet = (lastIndex !== active && actions.slice(0, actions.reduce((acc, nn, ii) => nn.index === active ? ii + 1 : acc, 0))) || actions;
+        newAction.index = lastIndex + 1;
+        return {
+          actions: actionSet.concat(newAction),
+          active: lastIndex + 1,
+        };
+      }
+
+      let current = new Date().getTime()
+      const time = () => {
+        const tempTime = current;
+        current = new Date().getTime();
+        return () => current - tempTime;
+      }
+
+      function stripFns(target) {
+        var out = {};
+
+        for (var i in target) {
+          out[i] = typeof target[i] === 'function' ? null : target[i];
+        }
+
+        return out;
+      }
+
+      function Store(state, name) {
+        const storeName = name || 'unnamed-' + (dev.get().stores.length + 1);
+        dev.dispatch(addStore, storeName);
+        let a = _radi.Store(state);
+        const superUpdate = a.update;
+        const superDispatch = a.dispatch;
+        storeHolder[storeName] = {
+          getInitial: a.getInitial,
+          update: superUpdate,
+        };
+
+        a.update = function(payload, fn, newTime) {
+          if (fn) {
+            dev.dispatch(addAction, {
+              name: fn.name,
+              payload: stripFns(payload),
+              time: (newTime() / 1000).toFixed(2),
+              store: storeName,
+            })
+          }
+          // console.log(payload, fn.name, newTime())
+          return superUpdate(payload)
+        }
+
+        a.dispatch = function(fn, ...args) {
+          const payload = fn(a.get(), ...args);
+          // console.log(fn.name)
+          // console.log('dispatch', {
+          //   action: fn.name,
+          //   args: args,
+          //   payload,
+          // });
+          // console.log('dispatch', fn.name, payload);
+          return this.update(payload, fn, time());
+        }
+
+        dev.dispatch(addAction, {
+          name: 'Initial State',
+          payload: stripFns(state),
+          time: (0).toFixed(2),
+          store: storeName,
+        })
+
+        return a;
+      }
+
+      const container = document.createElement('div');
+      document.body.appendChild(container)
+
+      function DevApp() {
+        this.style = `
+          #radDevTools {
+            display: block;
+            width: 300px;
+            position: fixed;
+            right: 0;
+            top: 0;
+            height: 100%;
+            z-index: 1000;
+            background-color: #1f2323;
+            color: #f0f0f0;
+            padding: 10px;
+          }
+          #radDevTools > ul {
+            display: block;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+            cursor: default;
+          }
+          #radDevTools > ul > li.action {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            background-color: #2d292d;
+            border-bottom: 2px solid #1e2323;
+            position: relative;
+          }
+          #radDevTools > ul > li.action:hover {
+            background-color: #3d3240;
+          }
+          #radDevTools > ul > li.action.active {
+            background-color: #725084;
+          }
+          #radDevTools > ul > li.action > i {
+            position: absolute;
+            right: 10px;
+            font-size: 12px;
+            opacity: 0.5;
+          }
+          #radDevTools > ul > li.action > strong {
+            display: block;
+            font-size: 14px;
+            font-weight: normal;
+            color: #98839e;
+            margin-bottom: 4px;
+          }
+          #radDevTools > ul > li.action > strong strong {
+            color: #fff;
+          }
+          #radDevTools > ul > li.action > span {
+            color: #d9acff;
+            font-size: 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-family: monospace;
+            display: block;
+            width: 100%;
+          }
+        `
+        return (
+          <div id="radDevTools">
+            <div>
+              <pre>{dev.render(({active}) => (
+                storeHolder[active]
+              ))}</pre>
+            </div>
+            hello, I am dev tools
+            <ul>
+              {dev.render(({stores}) => stores.map(store => (
+                <li class="store">{store}</li>
+              )))}
+              <hr/>
+              <button onclick={e => dev.dispatch(previous)}>Previous</button>
+              <button onclick={e => dev.dispatch(next)}>Next</button>
+              <hr/>
+              {dev.render(({actions, active}) => actions.map(action => (
+                <li onclick={e => dev.dispatch(setActive, action.index)} class={['action', active === action.index && 'active'].filter(a => a).join(' ')}>
+                  <i>+ {action.time}s</i>
+                  <strong><strong>{action.name}</strong> @ {action.store}</strong>
+                  <span>{JSON.stringify(action.payload)}</span>
+                </li>
+              )))}
+            </ul>
+          </div>
+        )
+      }
+
+      _radi.mount(
+        <DevApp/>,
+        container
+      )
+
+
+
+      return {
+        ..._radi,
+        Store,
+      }
+    }
+
+
+    const { h, mount, Store } = devTools(RadiExperiment);
+
+
+
+
+
+
+    function Fetch(url, map) {
+      const load = (next) => (setTimeout(() => next(map({user:{_key: 123}})), 5000))
+      return (payload) => {
+        return (state, name) => load((data) => state.dispatch(function Fetch() {return {[name]: data} }))
+      }
+    }
+
+    const Interests = new Fetch(
+      '/user/:id',
+      ({user}) => ({
+        id: user._key,
+        firstname: user.firstname,
+        lastname: user.lastname,
+        hobbies: user.interests,
+      })
+    );
+
+    const User = new Fetch(
+      '/user/:id',
+      ({user}) => ({
+        id: user._key,
+        firstname: user.firstname,
+        lastname: user.lastname,
+        hobbies: user.interests,
+        interests: Interests({id: 1}),
+      })
+    );
+
+    const userState = new Store({
+      id: 12,
+      user: User({id: 10}),
+      // user: null,
+    }, 'userState')
+
+    // const getUser = (state, id) => ({user: User({id})}) // => Update user in next async action
+    //
+    // setTimeout(() => {
+    //   userState.dispatch(getUser, 12)
+    //   userState.dispatchIn('user', getUser, 12)
+    // }, 1000)
+
+
+
+
+
+
 
     const store = new Store({
       rows: [],
-    })
+    }, 'Store')
 
     const create = (state, count) => {
       return {
@@ -184,7 +482,7 @@
       translateY: 0,
       rotation: 0,
       bars: [],
-    })
+    }, 'Sinwave')
 
     const getColors = ({barCount, count}) => {
       let arr = [];
@@ -244,10 +542,33 @@
       )
     }
 
+    /* Firstly we define state */
+    const counter = new Store({
+      count: 0
+    }, 'Counter')
+
+    /* Then we define some actions that will change state */
+    const up = ({count}, by) => ({count: count + by})
+    const down = ({count}, by) => ({count: count - by})
+
+    /* Then comes pure function component */
+    function Counter() {
+      return (
+        <div>
+          <h1>{ counter.render(s => s.count) }</h1>
+          <button onclick={ () => counter.dispatch(up, 1) }>Up</button>
+          <button onclick={ () => counter.dispatch(down, 1) }>Down</button>
+        </div>
+      )
+    }
+
     mount(
       // Counter,
-      <Sinwave/>,
-      // <Counter/>,
+      // <Sinwave/>,
+      <div>
+        <App/>
+        <Counter/>
+      </div>,
       // <h1><Counter/></h1>,
       // <h2>Hello World</h2>,
       // [1,2,3],

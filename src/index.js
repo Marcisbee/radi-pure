@@ -125,11 +125,19 @@ const RadiExperiment = (function() {
   }
 
   function addEventListeners($target, props) {
+    const exceptions = ['mount', 'destroy'];
     Object.keys(props).forEach(name => {
       if (isEventProp(name)) {
         $target.addEventListener(
           extractEventName(name),
-          props[name]
+          (e) => {
+            if (exceptions.indexOf(name) >= 0) {
+              if ($target === e.target) props[name](e);
+            } else {
+              props[name](e);
+            }
+          },
+          false
         );
       }
     });
@@ -185,7 +193,9 @@ const RadiExperiment = (function() {
 
     if (typeof node === 'function' || typeof node.type === 'function') {
       const fn = node.type || node;
+
       const lifecycles = {
+        name: fn.name,
         __$events: {},
         onMount: () => {},
         on: (event, fn) => {
@@ -212,8 +222,15 @@ const RadiExperiment = (function() {
         $parent
       );
 
+      let $styleRef;
+
       if ($element && typeof $element.addEventListener === 'function') {
-        $element.addEventListener('mount', () => {
+        $element.addEventListener('mount', (e) => {
+          if (typeof lifecycles.style === 'string') {
+            $styleRef = document.createElement('style')
+            $styleRef.innerHTML = lifecycles.style;
+            document.head.appendChild($styleRef);
+          }
           lifecycles.trigger('mount', $element, $parent);
         }, {
           passive: true,
@@ -222,6 +239,9 @@ const RadiExperiment = (function() {
 
         $element.addEventListener('destroy', (e) => {
           lifecycles.trigger('destroy', $element, $parent);
+          if ($styleRef instanceof Node) {
+            document.head.removeChild($styleRef);
+          }
         }, {
           passive: true,
           once: true,
@@ -338,31 +358,55 @@ const RadiExperiment = (function() {
     };
   };
 
+  function clone(target, store) {
+    var out = {};
+
+    // TODO: .map() -> pass update
+
+    for (var i in target) {
+      const name = i;
+      out[i] = typeof target[i] === 'function'
+        ? target[i](store, i)
+        : (typeof target[i] === 'object' && !Array.isArray(target[i]))
+          ? (console.log(target[i], i), clone(target[i], store.map(v => v[name])))
+          : target[i];
+    }
+
+    return out;
+  }
+
   function Store(state = {}) {
+    const OUT = {};
     let subscriptions = [];
 
-    let STORE = {
-      ...state,
-    };
+    const STORE = clone(state, OUT);
 
-    Object.setPrototypeOf(STORE, {
+    let latestStore = STORE;
+
+    Object.setPrototypeOf(OUT, {
+      getInitial: function() {
+        return STORE;
+      },
+      get: function() {
+        return latestStore;
+      },
       update: function (chunkState) {
         const newState = {
-          ...STORE,
-          ...chunkState,
+          ...latestStore,
+          ...clone(chunkState, OUT),
         }
         subscriptions.map(s => {
           if (typeof s === 'function') {
             s(newState);
           }
         });
-        return STORE = newState;
+        return latestStore = newState;
       },
       subscribe: function (fn) {
         subscriptions.push(fn);
       },
       dispatch: function (fn, ...args) {
-        const payload = fn(STORE, ...args);
+        const payload = fn(latestStore, ...args);
         // console.log('dispatch', {
         //   action: fn.name,
         //   args: args,
@@ -392,7 +436,7 @@ const RadiExperiment = (function() {
           this.onMount = (element, parent) => {
             $pointer = element;
             $parent = parent || element.parentNode;
-            update(STORE);
+            update(latestStore);
           }
           return '';
         };
@@ -400,10 +444,10 @@ const RadiExperiment = (function() {
         return item;
       },
       map: function(fn) {
-        const mapped = new Store(fn(STORE));
-        STORE.subscribe((state) => {
+        const mapped = new Store(fn(latestStore));
+        OUT.subscribe((state) => {
           const newState = fn(state);
-          if (JSON.stringify(newState) !== JSON.stringify(fn(STORE))) {
+          if (JSON.stringify(newState) !== JSON.stringify(fn(latestStore))) {
             mapped.update(newState);
           }
         });
@@ -411,7 +455,7 @@ const RadiExperiment = (function() {
       },
     });
 
-    return STORE;
+    return OUT;
   }
 
   return {
