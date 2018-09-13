@@ -495,10 +495,20 @@ const RadiExperiment = (function() {
     return OUT;
   }
 
+  function Fetch(url, map) {
+    // const load = (next) => (setTimeout(() => next(map({user:{_key: 123}})), 5000))
+    return (payload) => {
+      return (update) => setTimeout(update, 1000, map({user: {_key: 123} }))
+      // return (update) => load((data) => state.dispatch(function Fetch() {return {[name]: data} }))
+      // return (state, name) => load((data) => state.dispatch(function Fetch() {return {[name]: data} }))
+    }
+  }
+
   return {
     v: version,
     h: h,
     Store: Store,
-    mount: mount
+    mount: mount,
+    Fetch: Fetch
   }
 })()
