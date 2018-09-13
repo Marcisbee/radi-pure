@@ -360,18 +360,42 @@ const RadiExperiment = (function() {
     };
   };
 
-  function clone(target, store) {
-    var out = {};
+  function setDataInObject(source, path, data) {
+    const name = path[0]
+    let out = {
+      [name]: source[name],
+    };
+    let temp = out;
+    let i = 0;
+    while (i < path.length-1) {
+      temp = temp[path[i++]]
+    }
+    temp[path[i]] = data
+    return out
+  }
 
-    // TODO: .map() -> pass update
+  function map(target, store, source, path = []) {
+    let out = {};
+    if (!source) source = out;
 
-    for (var i in target) {
+    for (let i in target) {
       const name = i;
-      out[i] = typeof target[i] === 'function'
-        ? target[i](store, i)
-        : (typeof target[i] === 'object' && !Array.isArray(target[i]))
-          ? (console.log(target[i], i), clone(target[i], store.map(v => v[name])))
-          : target[i];
+      if (typeof target[i] === 'function') {
+        out[name] = null;
+        target[i]((data, useUpdate) => {
+          let payload = setDataInObject(source, path.concat(name), data);
+          if (!useUpdate) {
+            store.dispatch(function Fetch() { return payload });
+          } else {
+            store.update(payload);
+          }
+        })
+      } else {
+        out[name] = typeof target[name] === 'object'
+          && !Array.isArray(target[name])
+            ? map(target[name], store, source, path.concat(name))
+            : target[name]
+      }
     }
 
     return out;
@@ -380,10 +404,8 @@ const RadiExperiment = (function() {
   function Store(state = {}) {
     const OUT = {};
     let subscriptions = [];
-
-    const STORE = clone(state, OUT);
-
-    let latestStore = STORE;
+    let subscriptionsStrict = [];
+    let latestStore;
 
     Object.setPrototypeOf(OUT, {
       getInitial: function() {
@@ -392,10 +414,17 @@ const RadiExperiment = (function() {
       get: function() {
         return latestStore;
       },
-      update: function (chunkState) {
+      update: function (chunkState, noStrictSubs) {
         const newState = {
           ...latestStore,
-          ...clone(chunkState, OUT),
+          ...map(chunkState, OUT),
+        }
+        if (!noStrictSubs) {
+          subscriptionsStrict.map(s => {
+            if (typeof s === 'function') {
+              s(newState);
+            }
+          });
         }
         subscriptions.map(s => {
           if (typeof s === 'function') {
@@ -404,8 +433,12 @@ const RadiExperiment = (function() {
         });
         return latestStore = newState;
       },
-      subscribe: function (fn) {
-        subscriptions.push(fn);
+      subscribe: function (fn, strict) {
+        if (strict) {
+          subscriptionsStrict.push(fn);
+        } else {
+          subscriptions.push(fn);
+        }
       },
       dispatch: function (fn, ...args) {
         const payload = fn(latestStore, ...args);
@@ -445,17 +478,19 @@ const RadiExperiment = (function() {
 
         return item;
       },
-      map: function(fn) {
-        const mapped = new Store(fn(latestStore));
-        OUT.subscribe((state) => {
-          const newState = fn(state);
-          if (JSON.stringify(newState) !== JSON.stringify(fn(latestStore))) {
-            mapped.update(newState);
-          }
-        });
-        return mapped;
+      inject: function(update) {
+        if (typeof update !== 'function') {
+          console.warn('[Radi.js] Store\'s `.inject()` method must not be called on it\'s own. Instead use `{ field: Store.inject }`.');
+          return false;
+        }
+        OUT.subscribe(update, true);
+        update(latestStore, true);
       },
     });
+
+    const STORE = map(state, OUT);
+
+    latestStore = STORE;
 
     return OUT;
   }

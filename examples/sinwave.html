@@ -127,10 +127,23 @@
       })
       const storeHolder = {};
 
+      function stripFunctions(target) {
+        var out = {}
+
+        for (var i in target) {
+          out[i] = typeof target[i] === 'function'
+            ? null
+            : (typeof target[i] === 'object' && !Array.isArray(target[i])) ? stripFunctions(target[i]) : target[i];
+        }
+
+        return out
+      }
+
       const setActive = ({actions, stores, active}, newActive) => {
-        let inBetweenActions = actions.slice(newActive, active);
+        let current = actions.reduce((acc, nn, ii) => nn.index === newActive ? ii + 1 : acc, 0);
+        let inBetweenActions = actions.slice(current, active);
         let originals = actions
-          .slice(0, newActive)
+          .slice(0, current)
           .reduce(
             (acc, act) => (acc[act.store] = (acc[act.store] || []).concat(act.payload),acc),
             {}
@@ -140,18 +153,18 @@
           if (typeof originals[stores[i]] !== 'undefined') {
             storeHolder[stores[i]].update(
               Object.assign(
-                storeHolder[stores[i]].getInitial(),
-                ...originals[stores[i]]
-              )
+                stripFunctions(storeHolder[stores[i]].getInitial()),
+                ...originals[stores[i]].map(stripFunctions)
+              ), true
             );
           } else {
             for (var n = 0; n < inBetweenActions.length; n++) {
               if (stores[i] === inBetweenActions[n].store) {
                 storeHolder[stores[i]].update(
                   Object.assign(
-                    storeHolder[stores[i]].getInitial(),
-                    inBetweenActions[n].payload
-                  )
+                    stripFunctions(storeHolder[stores[i]].getInitial()),
+                    stripFunctions(inBetweenActions[n].payload)
+                  ), true
                 );
                 break;
               }
@@ -162,15 +175,15 @@
         return { active: newActive };
       }
       const next = ({actions, active}) => {
-        const go = actions.reduce((acc, nn, ii) => nn.index === active ? ii + 1 : acc, 0) + 1;
-        if (go <= actions.length) {
-          dev.dispatch(setActive, go);
+        const go = actions.reduce((acc, nn, ii) => nn.index === active ? ii : acc, 0) + 1;
+        if (go < actions.length) {
+          dev.dispatch(setActive, actions[go].index);
         }
       }
       const previous = ({actions, active}) => {
-        const go = actions.reduce((acc, nn, ii) => nn.index === active ? ii + 1 : acc, 0) - 1;
-        if (go > 0) {
-          dev.dispatch(setActive, go);
+        const go = actions.reduce((acc, nn, ii) => nn.index === active ? ii : acc, 0) - 1;
+        if (go >= 0) {
+          dev.dispatch(setActive, actions[go].index);
         }
       }
       const addStore = ({stores}, newStore) => ({stores: stores.concat(newStore)})
@@ -191,16 +204,6 @@
         return () => current - tempTime;
       }
 
-      function stripFns(target) {
-        var out = {};
-
-        for (var i in target) {
-          out[i] = typeof target[i] === 'function' ? null : target[i];
-        }
-
-        return out;
-      }
-
       function Store(state, name) {
         const storeName = name || 'unnamed-' + (dev.get().stores.length + 1);
         dev.dispatch(addStore, storeName);
@@ -212,17 +215,17 @@
           update: superUpdate,
         };
 
-        a.update = function(payload, fn, newTime) {
+        a.update = function(payload, noSubs, fn, newTime) {
           if (fn) {
             dev.dispatch(addAction, {
               name: fn.name,
-              payload: stripFns(payload),
+              payload: stripFunctions(payload),
               time: (newTime() / 1000).toFixed(2),
               store: storeName,
             })
           }
           // console.log(payload, fn.name, newTime())
-          return superUpdate(payload)
+          return superUpdate(payload, noSubs)
         }
 
         a.dispatch = function(fn, ...args) {
@@ -234,12 +237,12 @@
           //   payload,
           // });
           // console.log('dispatch', fn.name, payload);
-          return this.update(payload, fn, time());
+          return this.update(payload, false, fn, time());
         }
 
         dev.dispatch(addAction, {
           name: 'Initial State',
-          payload: stripFns(state),
+          payload: stripFunctions(state),
           time: (0).toFixed(2),
           store: storeName,
         })
@@ -363,9 +366,11 @@
 
 
     function Fetch(url, map) {
-      const load = (next) => (setTimeout(() => next(map({user:{_key: 123}})), 5000))
+      // const load = (next) => (setTimeout(() => next(map({user:{_key: 123}})), 5000))
       return (payload) => {
-        return (state, name) => load((data) => state.dispatch(function Fetch() {return {[name]: data} }))
+        return (update) => setTimeout(update, 1000, map({user: {_key: 123} }))
+        // return (update) => load((data) => state.dispatch(function Fetch() {return {[name]: data} }))
+        // return (state, name) => load((data) => state.dispatch(function Fetch() {return {[name]: data} }))
       }
     }
 
@@ -373,9 +378,6 @@
       '/user/:id',
       ({user}) => ({
         id: user._key,
-        firstname: user.firstname,
-        lastname: user.lastname,
-        hobbies: user.interests,
       })
     );
 
@@ -409,142 +411,143 @@
 
 
 
-    const store = new Store({
-      rows: [],
-    }, 'Store')
-
-    const create = (state, count) => {
-      return {
-        rows: buildData(count, 0),
-      }
-    }
-
-    const remove = ({rows}, count) => {
-      return {
-        rows: count ? rows.slice(0,count) : [],
-      }
-    }
-
-    const every = ({rows}, interval) => {
-      return {
-        rows: rows.map((r, i) => (
-          !((i + 1) % interval)
-            ? { ...r, value: r.value + ' !!!' }
-            : r
-        )),
-      }
-    }
-
-    const swap = ({rows}, from, to) => {
-      const temp1 = {...(rows.slice(from, from+1)[0])}
-      const temp2 = {...(rows.slice(to, to+1)[0])}
-      rows[from] = temp2;
-      rows[to] = temp1;
-      return {
-        rows,
-      }
-    }
-
-    const reverse = ({rows}) => {
-      return {
-        rows: rows.reverse(),
-      }
-    }
-
-    const App = function() {
-      return (
-        <div>
-          <h1 style={{color: 'red'}}>Hello World</h1>
-          <button onclick={ e => store.dispatch(create, 1) }>Create 1</button>
-          <button onclick={ e => store.dispatch(create, 1000) }>Create 1k</button>
-          <button onclick={ e => store.dispatch(create, 10000) }>Create 10k</button>
-          <button onclick={ e => store.dispatch(reverse) }>reverse</button>
-          <button onclick={ e => store.dispatch(every, 10) }>every 10</button>
-          <button onclick={ e => store.dispatch(swap, 4, 9) }>swap 4,9</button>
-          <button onclick={ e => store.dispatch(remove) }>remove</button>
-          <ul>
-            {store.render(v => v.rows.map((item,n) => <li>{item.id}. {item.value}</li>))}
-          </ul>
-        </div>
-      )
-    }
-
-
-
-
-
-    const sinwave = new Store({
-      barWidth: 1,
-      barCount: 100,
-      active: false,
-      count: 0,
-      step: 0.5,
-      translateY: 0,
-      rotation: 0,
-      bars: [],
-    }, 'Sinwave')
-
-    const getColors = ({barCount, count}) => {
-      let arr = [];
-      for (var i = 0; i < barCount; i++) {
-        var hue = (360 / barCount * i - count) % 360;
-        var t = Math.sin(count/10 + i/5) * 100 * .5;
-        var r = (count+i)%360;
-        arr.push({
-          id: i,
-          color: 'hsl(' + hue + ',95%,55%)',
-          translateY: t,
-          rotation: r,
-        });
-      }
-      return arr;
-    }
-
-    const sinwaveTick = (state) => {
-      if (state.active) {
-        window.requestAnimationFrame(() => {
-          sinwave.dispatch(sinwaveTick);
-        });
-        return {
-          bars: getColors(state),
-          count: state.count + state.step,
-        }
-      }
-      return {}
-    }
-
-    const start = () => ({
-      active: true,
-    })
-
-    const stop = () => ({
-      active: false,
-    })
-
-    function Sinwave() {
-      return (
-        <div>
-          <div class="animated-sin-wave">
-            {sinwave.render((state) => (
-              state.bars.map((bar, i) => <div class="bar" style={{
-                width: state.barWidth + '%',
-                left: ( state.barWidth * i ) + '%',
-                transform: 'scale(0.8,.5) translateY(' + bar.translateY + '%) rotate(' + bar.rotation + 'deg)',
-                backgroundColor: bar.color,
-              }}></div>)
-            ))}
-          </div>
-          <button onclick={e => (
-            sinwave.dispatch(start),
-            sinwave.dispatch(sinwaveTick)
-          )}>Start</button>
-        </div>
-      )
-    }
+    // const store = new Store({
+    //   rows: [],
+    // }, 'Store')
+    //
+    // const create = (state, count) => {
+    //   return {
+    //     rows: buildData(count, 0),
+    //   }
+    // }
+    //
+    // const remove = ({rows}, count) => {
+    //   return {
+    //     rows: count ? rows.slice(0,count) : [],
+    //   }
+    // }
+    //
+    // const every = ({rows}, interval) => {
+    //   return {
+    //     rows: rows.map((r, i) => (
+    //       !((i + 1) % interval)
+    //         ? { ...r, value: r.value + ' !!!' }
+    //         : r
+    //     )),
+    //   }
+    // }
+    //
+    // const swap = ({rows}, from, to) => {
+    //   const temp1 = {...(rows.slice(from, from+1)[0])}
+    //   const temp2 = {...(rows.slice(to, to+1)[0])}
+    //   rows[from] = temp2;
+    //   rows[to] = temp1;
+    //   return {
+    //     rows,
+    //   }
+    // }
+    //
+    // const reverse = ({rows}) => {
+    //   return {
+    //     rows: rows.reverse(),
+    //   }
+    // }
+    //
+    // const App = function() {
+    //   return (
+    //     <div>
+    //       <h1 style={{color: 'red'}}>Hello World</h1>
+    //       <button onclick={ e => store.dispatch(create, 1) }>Create 1</button>
+    //       <button onclick={ e => store.dispatch(create, 1000) }>Create 1k</button>
+    //       <button onclick={ e => store.dispatch(create, 10000) }>Create 10k</button>
+    //       <button onclick={ e => store.dispatch(reverse) }>reverse</button>
+    //       <button onclick={ e => store.dispatch(every, 10) }>every 10</button>
+    //       <button onclick={ e => store.dispatch(swap, 4, 9) }>swap 4,9</button>
+    //       <button onclick={ e => store.dispatch(remove) }>remove</button>
+    //       <ul>
+    //         {store.render(v => v.rows.map((item,n) => <li>{item.id}. {item.value}</li>))}
+    //       </ul>
+    //     </div>
+    //   )
+    // }
+    //
+    //
+    //
+    //
+    //
+    // const sinwave = new Store({
+    //   barWidth: 1,
+    //   barCount: 100,
+    //   active: false,
+    //   count: 0,
+    //   step: 0.5,
+    //   translateY: 0,
+    //   rotation: 0,
+    //   bars: [],
+    // }, 'Sinwave')
+    //
+    // const getColors = ({barCount, count}) => {
+    //   let arr = [];
+    //   for (var i = 0; i < barCount; i++) {
+    //     var hue = (360 / barCount * i - count) % 360;
+    //     var t = Math.sin(count/10 + i/5) * 100 * .5;
+    //     var r = (count+i)%360;
+    //     arr.push({
+    //       id: i,
+    //       color: 'hsl(' + hue + ',95%,55%)',
+    //       translateY: t,
+    //       rotation: r,
+    //     });
+    //   }
+    //   return arr;
+    // }
+    //
+    // const sinwaveTick = (state) => {
+    //   if (state.active) {
+    //     window.requestAnimationFrame(() => {
+    //       sinwave.dispatch(sinwaveTick);
+    //     });
+    //     return {
+    //       bars: getColors(state),
+    //       count: state.count + state.step,
+    //     }
+    //   }
+    //   return {}
+    // }
+    //
+    // const start = () => ({
+    //   active: true,
+    // })
+    //
+    // const stop = () => ({
+    //   active: false,
+    // })
+    //
+    // function Sinwave() {
+    //   return (
+    //     <div>
+    //       <div class="animated-sin-wave">
+    //         {sinwave.render((state) => (
+    //           state.bars.map((bar, i) => <div class="bar" style={{
+    //             width: state.barWidth + '%',
+    //             left: ( state.barWidth * i ) + '%',
+    //             transform: 'scale(0.8,.5) translateY(' + bar.translateY + '%) rotate(' + bar.rotation + 'deg)',
+    //             backgroundColor: bar.color,
+    //           }}></div>)
+    //         ))}
+    //       </div>
+    //       <button onclick={e => (
+    //         sinwave.dispatch(start),
+    //         sinwave.dispatch(sinwaveTick)
+    //       )}>Start</button>
+    //     </div>
+    //   )
+    // }
 
     /* Firstly we define state */
     const counter = new Store({
-      count: 0
+      count: 0,
+      user: userState.inject,
     }, 'Counter')
 
     /* Then we define some actions that will change state */
@@ -555,6 +558,7 @@
     function Counter() {
       return (
         <div>
+          <pre>{ counter.render(({user}) => JSON.stringify(user)) }</pre>
           <h1>{ counter.render(s => s.count) }</h1>
           <button onclick={ () => counter.dispatch(up, 1) }>Up</button>
           <button onclick={ () => counter.dispatch(down, 1) }>Down</button>
@@ -566,7 +570,6 @@
       // Counter,
       // <Sinwave/>,
       <div>
-        <App/>
         <Counter/>
       </div>,
       // <h1><Counter/></h1>,
