@@ -395,7 +395,7 @@ const RadiExperiment = (function() {
 
   function map(target, store, source, path = []) {
     let out = {};
-    if (target.$loading) {
+    if (target && target.$loading) {
       Object.defineProperty(out, '$loading', {
         value: true,
         writable: false
