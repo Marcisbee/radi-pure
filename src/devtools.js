@@ -17,11 +17,23 @@ const RadiDevtools = (function() {
 
     function stripFunctions(target) {
       var out = {}
+      if (target.$loading) {
+        Object.defineProperty(out, '$loading', {
+          value: true,
+          writable: false
+        });
+      }
 
       for (var i in target) {
-        out[i] = typeof target[i] === 'function'
-          ? null
-          : (typeof target[i] === 'object' && !Array.isArray(target[i])) ? stripFunctions(target[i]) : target[i];
+        if (typeof target[i] === 'function') {
+          out[i] = {};
+          Object.defineProperty(out[i], '$loading', {
+            value: true,
+            writable: false
+          });
+        } else {
+          out[i] = (typeof target[i] === 'object' && !Array.isArray(target[i])) ? stripFunctions(target[i]) : target[i];
+        }
       }
 
       return out
@@ -219,35 +231,80 @@ const RadiDevtools = (function() {
           margin: 10px 0;
         }
       `
-      return (
-        <div id="radiDevTools">
-          <div class="radi-dev-tool-logo">
-            <img src={LOGO} alt="Radi devtools logo"/>
-          </div>
-          <hr/>
-          Stores:
-          <ul>
-            {dev.render(({stores}) => stores.map(store => (
-              <li class="store">- {store}</li>
-            )))}
-            <hr/>
-            <button onclick={e => dev.dispatch(previous)}>Previous</button>
-            <button onclick={e => dev.dispatch(next)}>Next</button>
-            <hr/>
-            {dev.render(({actions, active}) => actions.map(action => (
-              <li onclick={e => dev.dispatch(setActive, action.index)} class={['action', active === action.index && 'active'].filter(a => a).join(' ')}>
-                <i>+ {action.time}s</i>
-                <strong><strong>{action.name}</strong> @ {action.store}</strong>
-                <span>{JSON.stringify(action.payload)}</span>
-              </li>
-            )))}
-          </ul>
-        </div>
+
+      return h(
+        "div",
+        { id: "radiDevTools" },
+        h(
+          "div",
+          { class: "radi-dev-tool-logo" },
+          h("img", { src: LOGO, alt: "Radi devtools logo" })
+        ),
+        h("hr", null),
+        "Stores:",
+        h(
+          "ul",
+          null,
+          dev.render(({ stores }) =>
+            stores.map(store => h("li", { class: "store" }, "- ", store))
+          ),
+          h("hr", null),
+          h("button", { onclick: e => dev.dispatch(previous) }, "Previous"),
+          h("button", { onclick: e => dev.dispatch(next) }, "Next"),
+          h("hr", null),
+          dev.render(({ actions, active }) =>
+            actions.map(action =>
+              h(
+                "li",
+                {
+                  onclick: e => dev.dispatch(setActive, action.index),
+                  class: ["action", active === action.index && "active"]
+                    .filter(a => a)
+                    .join(" ")
+                },
+                h("i", null, "+ ", action.time, "s"),
+                h(
+                  "strong",
+                  null,
+                  h("strong", null, action.name),
+                  " @ ",
+                  action.store
+                ),
+                h("span", null, JSON.stringify(action.payload))
+              )
+            )
+          )
+        )
       )
+      // return (
+      //   <div id="radiDevTools">
+      //     <div class="radi-dev-tool-logo">
+      //       <img src={LOGO} alt="Radi devtools logo"/>
+      //     </div>
+      //     <hr/>
+      //     Stores:
+      //     <ul>
+      //       {dev.render(({stores}) => stores.map(store => (
+      //         <li class="store">- {store}</li>
+      //       )))}
+      //       <hr/>
+      //       <button onclick={e => dev.dispatch(previous)}>Previous</button>
+      //       <button onclick={e => dev.dispatch(next)}>Next</button>
+      //       <hr/>
+      //       {dev.render(({actions, active}) => actions.map(action => (
+      //         <li onclick={e => dev.dispatch(setActive, action.index)} class={['action', active === action.index && 'active'].filter(a => a).join(' ')}>
+      //           <i>+ {action.time}s</i>
+      //           <strong><strong>{action.name}</strong> @ {action.store}</strong>
+      //           <span>{JSON.stringify(action.payload)}</span>
+      //         </li>
+      //       )))}
+      //     </ul>
+      //   </div>
+      // )
     }
 
     _radi.mount(
-      <DevApp/>,
+      h(DevApp),
       container
     )
 

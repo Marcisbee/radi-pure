@@ -36,7 +36,15 @@ const RadiExperiment = (function() {
         return $parent.insertBefore(newNode, referenceNode.nextSibling);
       }
     }
-  };
+  }
+
+  function autoUpdate(value, fn) {
+    if (typeof value === 'function' && value.__radiStateUpdater) {
+      return value(fn);
+    } else {
+      return fn(value);
+    }
+  }
 
   function h(type, props, ...children) {
     if (typeof type === 'number') {
@@ -99,13 +107,22 @@ const RadiExperiment = (function() {
 
   function setStyles($target, styles) {
     Object.keys(styles).forEach(name => {
-      $target.style[name] = styles[name];
-    })
+      autoUpdate(styles[name], value => {
+        $target.style[name] = value;
+      });
+    });
   }
 
   function setProps($target, props) {
     Object.keys(props).forEach(name => {
-      setProp($target, name, props[name]);
+      autoUpdate(props[name], value => {
+        if (name === 'class' || name === 'className') {
+          if (Array.isArray(value)) {
+            value = value.filter(v => v && typeof v !== 'function').join(' ');
+          }
+        }
+        setProp($target, name, value);
+      });
     });
   }
 
@@ -120,7 +137,9 @@ const RadiExperiment = (function() {
   function updateProps($target, newProps, oldProps = {}) {
     const props = Object.assign({}, newProps, oldProps);
     Object.keys(props).forEach(name => {
-      updateProp($target, name, newProps[name], oldProps[name]);
+      autoUpdate(newProps[name], value => {
+        updateProp($target, name, value, oldProps[name]);
+      });
     });
   }
 
@@ -277,7 +296,7 @@ const RadiExperiment = (function() {
       return createElement(JSON.stringify(node), $parent);
     }
 
-    console.error('Unhandled node', node)
+    console.error('Unhandled node', node);
   }
 
   function ensureArray(a) {
@@ -376,12 +395,22 @@ const RadiExperiment = (function() {
 
   function map(target, store, source, path = []) {
     let out = {};
+    if (target.$loading) {
+      Object.defineProperty(out, '$loading', {
+        value: true,
+        writable: false
+      });
+    }
     if (!source) source = out;
 
     for (let i in target) {
       const name = i;
       if (typeof target[i] === 'function') {
-        out[name] = null;
+        out[name] = {};
+        Object.defineProperty(out[name], '$loading', {
+          value: true,
+          writable: false
+        });
         target[i]((data, useUpdate) => {
           let payload = setDataInObject(source, path.concat(name), data);
           if (!useUpdate) {
@@ -391,7 +420,7 @@ const RadiExperiment = (function() {
           }
         })
       } else {
-        out[name] = typeof target[name] === 'object'
+        out[name] = target[name] && typeof target[name] === 'object'
           && !Array.isArray(target[name])
             ? map(target[name], store, source, path.concat(name))
             : target[name]
@@ -419,6 +448,7 @@ const RadiExperiment = (function() {
           ...latestStore,
           ...map(chunkState, OUT),
         }
+        latestStore = newState;
         if (!noStrictSubs) {
           subscriptionsStrict.map(s => {
             if (typeof s === 'function') {
@@ -431,7 +461,7 @@ const RadiExperiment = (function() {
             s(newState);
           }
         });
-        return latestStore = newState;
+        return latestStore;
       },
       subscribe: function (fn, strict) {
         if (strict) {
@@ -456,6 +486,7 @@ const RadiExperiment = (function() {
         let $current;
         let newTree;
         let oldTree;
+        let mounted = false;
 
         function update(state) {
           newTree = fn(state);
@@ -464,11 +495,14 @@ const RadiExperiment = (function() {
         }
 
         subscriptions.push((state, ...args) => {
-          update(state);
+          if (mounted) {
+            update(state);
+          }
         });
 
         function item() {
           this.onMount = (element, parent) => {
+            mounted = true;
             $pointer = element;
             $parent = parent || element.parentNode;
             update(latestStore);
@@ -485,6 +519,25 @@ const RadiExperiment = (function() {
         }
         OUT.subscribe(update, true);
         update(latestStore, true);
+      },
+      out: function(fn) {
+        let lastValue;
+        function stateUpdater(update) {
+          if (typeof update === 'function') {
+            OUT.subscribe(s => {
+              const newValue = fn(s);
+              if (lastValue !== newValue) {
+                update(newValue);
+              }
+            });
+            update(lastValue = fn(latestStore), true);
+          } else {
+            let a = OUT.render(fn);
+            return a;
+          }
+        }
+        stateUpdater.__radiStateUpdater = true;
+        return stateUpdater;
       },
     });
 

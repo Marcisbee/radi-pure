@@ -41,7 +41,7 @@
 
   <script src="https://unpkg.com/@babel/standalone@7.0.0/babel.min.js"></script>
   <script src="../src/index.js"></script>
-  <!-- <script src="../src/devtools.js"></script> -->
+  <script src="../src/devtools.js"></script>
   <script>
     const rand = Math.random
 
@@ -116,14 +116,12 @@
   </script>
   <script type="text/babel">
     /* @jsx h */
-    // const { h, mount, Store, Fetch } = RadiDevtools.attatch(RadiExperiment);
-    const { h, mount, Store, Fetch } = RadiExperiment;
+    const { h, mount, Store, Fetch } = RadiDevtools.attatch(RadiExperiment);
+    // const { h, mount, Store, Fetch } = RadiExperiment;
 
     const Interests = new Fetch(
       '/user/:id',
-      ({user}) => ({
-        id: user._key,
-      })
+      ({user}) => (['football', 'hockey'])
     );
 
     const User = new Fetch(
@@ -291,10 +289,12 @@
     /* Firstly we define state */
     const counter = new Store({
       count: 0,
+      color: 0,
       user: userState.inject,
     }, 'Counter')
 
     /* Then we define some actions that will change state */
+    const color = ({color}, by) => ({color: (color + by) % 360})
     const up = ({count}, by) => ({count: count + by})
     const down = ({count}, by) => ({count: count - by})
 
@@ -302,8 +302,15 @@
     function Counter() {
       return (
         <div>
-          <pre>{ counter.render(({user}) => JSON.stringify(user)) }</pre>
-          <h1>{ counter.render(s => s.count) }</h1>
+          <pre class={counter.out(({user}) => [
+            1,
+            !user.$loading && 'user-name',
+            2,
+          ])}>{ counter.out(({user}) => !user.$loading ? JSON.stringify(user) : 'Loading..') }</pre>
+          <div>User: { counter.out(({user}) => !user.$loading ? 'Done!' : 'Loading..') }</div>
+          <div>Interests: { counter.out(({user}) => ((user.user && user.user.interests && !user.user.interests.$loading) ? 'Done!' : 'Loading..')) }</div>
+          <h1 style={{background: 'orange', color: counter.out(({color}) => 'hsl('+color+', 100%, 50%)')}}>{ counter.out(s => <i class={counter.out(({color}) => 'hsl('+color+', 100%, 50%)')}>{s.count}</i>) }</h1>
+          <button onclick={ () => counter.dispatch(color, 10) }>Color</button>
           <button onclick={ () => counter.dispatch(up, 1) }>Up</button>
           <button onclick={ () => counter.dispatch(down, 1) }>Down</button>
         </div>
