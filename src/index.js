@@ -272,7 +272,15 @@ const RadiExperiment = (function() {
 
     if (typeof node === 'object') {
       if (node.type) {
-        const $el = document.createElement(node.type);
+        let $el;
+        if (node.type === 'svg' || $parent instanceof SVGElement) {
+          $el = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            node.type
+          )
+        } else {
+          $el = document.createElement(node.type);
+        }
         let $lastEl = null;
         setProps($el, node.props);
         addEventListeners($el, node.props);
