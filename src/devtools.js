@@ -245,14 +245,12 @@ const RadiDevtools = (function() {
         h(
           "ul",
           null,
-          dev.render(({ stores }) =>
-            stores.map(store => h("li", { class: "store" }, "- ", store))
-          ),
+          dev(({stores}) => stores.map(store => h("li", { class: "store" }, "- ", store))),
           h("hr", null),
           h("button", { onclick: e => dev.dispatch(previous) }, "Previous"),
           h("button", { onclick: e => dev.dispatch(next) }, "Next"),
           h("hr", null),
-          dev.render(({ actions, active }) =>
+          dev(({actions, active}) => (
             actions.map(action =>
               h(
                 "li",
@@ -273,7 +271,7 @@ const RadiDevtools = (function() {
                 h("span", null, JSON.stringify(action.payload))
               )
             )
-          )
+          ))
         )
       )
       // return (

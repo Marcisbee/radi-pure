@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta http-equiv="X-UA-Compatible" content="ie=edge"/>
+  <title>Radi sinwave</title>
+  <style>
+    body {
+      font-family: Arial;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    .animated-sin-wave {
+      position: relative;
+      height: 150px;
+      width: 100%;
+      overflow: hidden;
+    }
+
+    .animated-sin-wave > .bar {
+      position: absolute;
+      height: 100%;
+      border-radius: 50%;
+      max-width: 10px;
+      transform: scale(0.8,.5) translateY(0%) rotate(0deg)
+    }
+
+    .animated-sin-wave-description {
+      width: 100%;
+      text-align: center;
+      font-size: 0.8em;
+      color: #747678;
+      padding: 2em;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://unpkg.com/@babel/standalone@7.0.0/babel.min.js"></script>
+  <script src="../src/index.js"></script>
+  <script src="../../radi/dist/radi.js"></script>
+  <script src="../src/devtools.js"></script>
+  <script type="text/babel">
+    /* @jsx h */
+    // const { h, mount, Store, Fetch } = RadiDevtools.attatch(RadiExperiment);
+    // const { h, mount, Store, Fetch } = RadiExperiment;
+    // const { h, mount, Store, Subscribe, Validator } = RadiDevtools.attatch(Radi);
+    const { h, mount, Store, Subscribe, Validator } = Radi;
+    // const { Fetch } = RadiExperiment;
+
+    // const mouseEvent = new Subscribe().on('mousemove', (data) => ({x: data.x, y: data.y}))
+    //
+    // const tracker = new Store({
+    //   mouse: mouseEvent({x: 0, y: 0}),
+    // }, 'tracker')
+    //
+    // const move = (state, position) => position
+
+    const passwordStore = new Store({
+      password: 'Hell',
+    })
+
+    const movieData = (password) => new Promise(resolve => {
+      setTimeout(resolve, 1000, [<h1>Hello Movies : {password}</h1>, <h2>Last</h2>]);
+    })
+
+    const toString = s => JSON.stringify(s);
+    const toJSON = s => JSON.parse(s);
+
+    function App() {
+      return (
+        <div>
+          <div>
+            {passwordStore(({password}) => (
+              <await src={movieData(password)} placeholder="LOADING"></await>
+            ))}
+          </div>
+          <div>
+            {passwordStore(a => (
+              <div>{passwordStore(b => (
+                a.password + b.password
+              ))}</div>
+            ))}
+          </div>
+          <input type="text" name="password" {...passwordStore.bind('password')} />
+          {/*<errors name="app" onrender={errors => (
+            <ul>
+              {errors.filter(v => v.touched).map(e => (
+                <li>{e.error}</li>
+              ))}
+            </ul>
+          )}/>
+          <form name="app" action="#" prevent onsubmit={(e, values) => (console.log(values), e.target.reset())} onvalidate={e => ({
+            optin: value => new Validator(value)
+              .required()
+              .error('Optin must be checked')
+              .equal('true')
+              .error('Optin must be true'),
+            username: value => new Validator(value)
+              .required()
+              .error('Username is required'),
+            password: value => new Validator(value)
+              .required()
+              .error('Password is required'),
+            password2: (value, {password}) => new Validator(value)
+              .required()
+              .error('Password is required')
+              .equal(password)
+              .error('Passwords must match'),
+          })}>
+            {passwordStore(value => value.password)}
+            <input type="radio" name="optin" value="true" checked />
+            <input type="radio" name="optin" value="false" />
+            <input type="radio" name="optin" value="false" />
+            <input type="text" name="username" />
+            <input type="text" name="password" {...passwordStore.bind('password')} />
+            <input type="text" name="password2" {...passwordStore.bind('password')} />
+            <button type="submit" disabled>asd</button>
+          </form>*/}
+        </div>
+      )
+    }
+
+    mount(<App/>, app);
+
+    // addEventListener("mousemove", ({x,y}) => tracker.dispatch(move, {x,y}));
+
+  </script>
+</body>
+</html>

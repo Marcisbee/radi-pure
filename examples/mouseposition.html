@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta http-equiv="X-UA-Compatible" content="ie=edge"/>
+  <title>Radi sinwave</title>
+  <style>
+    body {
+      font-family: Arial;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    .animated-sin-wave {
+      position: relative;
+      height: 150px;
+      width: 100%;
+      overflow: hidden;
+    }
+
+    .animated-sin-wave > .bar {
+      position: absolute;
+      height: 100%;
+      border-radius: 50%;
+      max-width: 10px;
+      transform: scale(0.8,.5) translateY(0%) rotate(0deg)
+    }
+
+    .animated-sin-wave-description {
+      width: 100%;
+      text-align: center;
+      font-size: 0.8em;
+      color: #747678;
+      padding: 2em;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://unpkg.com/@babel/standalone@7.0.0/babel.min.js"></script>
+  <script src="../src/index.js"></script>
+  <script src="../../radi/dist/radi.js"></script>
+  <script src="../../radi-fetch/dist/radi-fetch.js"></script>
+  <script src="../src/devtools.js"></script>
+  <script type="text/babel">
+    /* @jsx h */
+    // const { h, mount, Store, Fetch } = RadiDevtools.attatch(RadiExperiment);
+    // const { h, mount, Store, Fetch } = RadiExperiment;
+    const { h, mount, Store, Subscribe, plugin } = Radi
+    const Fetch = plugin(RadiFetch, {
+      baseUrl: 'https://randomuser.me/api/',
+      /* headers: {
+        'content-type': 'application/json',
+      }, */
+      dummy: false,
+      dummyTimeout: 0,
+      /* dummyTimeout: 2000, */
+      // dummyData,
+    })
+    // const { h, mount, Store, Subscribe } = RadiDevtools.attatch(Radi)
+    // const { Fetch } = RadiExperiment;
+
+    // const Fetch = RadiFetch.config({
+    //   baseUrl: 'https://randomuser.me/api/',
+    //   headers: {
+    //     'content-type': 'application/json',
+    //   },
+    // })
+
+    const User = Fetch.get('', e => e, { retry: 2 });
+    // const User = Fetch.dummy(({results}) => ({hello: 'world ' + results}), 1000);
+
+    Fetch.http.get('').then(e => {
+      console.log(e)
+    });
+
+    const Position = new Subscribe().on('mousemove', ({x, y}) => ({x, y}))
+    const Pressed = new Subscribe().on('mousedown mouseup', (e, name) => ({pressed: name === 'mousedown'}))
+
+    const tracker = new Store({
+      position: Position({x: 0, y: 0}),
+      pressed: Pressed({pressed: false}).map(e => e.pressed),
+    })
+
+    tracker.subscribe(({pressed}) => (
+      pressed
+        ? Position.start()
+        : Position.stop()
+    ))
+
+    const counter = new Store({
+      count: 0,
+      step: 100,
+    }, 'counter');
+
+    const upAction = ({count}) => ({count: count + 1});
+    const stepAction = ({step}) => ({step: step + 1});
+
+    function MousePosition({
+      up = counter.willDispatch(upAction),
+      step = counter.willDispatch(stepAction),
+    }) {
+      return (
+        <div>
+          <div style={{color: tracker(({position}) => `hsl(${position.x || 0}, 100%, 50%)`)}}>
+            { tracker(({position}) => `hsl(${position.x || 0}, 100%, 50%)`) }
+            { tracker(({pressed, position}) => (
+              <h1>
+                <span>Mouse pressed: {pressed.toString()}</span>
+                <br/>
+                <i>Position while <strong>pressed</strong>: {position.x}, {position.y}</i>
+              </h1>
+            )) }
+          </div>
+          <h1>{counter((state) => state.count <= 5 ? state.count : state.count / state.step )}</h1>
+          <button onclick={up}>+</button>
+          <button onclick={step}>step</button>
+        </div>
+      )
+    }
+
+    mount(<MousePosition/>, app)
+
+  </script>
+</body>
+</html>

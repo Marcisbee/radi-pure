@@ -20,19 +20,15 @@ const RadiExperiment = (function() {
     return node;
   }
 
-  function isNode(node) {
-    return node instanceof Node;
-  }
-
   function insertAfter(newNode, referenceNode, $parent) {
     if (!$parent) $parent = referenceNode.parentNode;
 
-    if (isNode(newNode)) {
+    if (newNode instanceof Node) {
       if (referenceNode === null || referenceNode === undefined) {
         return $parent.insertBefore(newNode, referenceNode);
       }
 
-      if (isNode(referenceNode)) {
+      if (referenceNode instanceof Node) {
         return $parent.insertBefore(newNode, referenceNode.nextSibling);
       }
     }
@@ -556,10 +552,25 @@ const RadiExperiment = (function() {
     return OUT;
   }
 
+  function applyLoading(subject, value) {
+    if (typeof subject === 'object') {
+      console.log(subject, value)
+      Object.defineProperty(subject, '$loading', {
+        value: value,
+        writable: false,
+      });
+    }
+    return subject;
+  }
+
   function Fetch(url, map) {
     // const load = (next) => (setTimeout(() => next(map({user:{_key: 123}})), 5000))
     return (payload) => {
-      return (update) => setTimeout(update, 1000, map({user: {_key: 123} }))
+      return (update) => {
+        setTimeout(update, 1000, applyLoading(map({user: {_key: 123} }), false))
+
+        return applyLoading({}, true)
+      }
       // return (update) => load((data) => state.dispatch(function Fetch() {return {[name]: data} }))
       // return (state, name) => load((data) => state.dispatch(function Fetch() {return {[name]: data} }))
     }

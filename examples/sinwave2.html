@@ -119,136 +119,136 @@
   <script type="text/babel">
     /* @jsx h */
     // const { h, mount, Store, Fetch } = RadiDevtools.attatch(RadiExperiment);
-    // const { h, mount, patch, Store, service, customTag } = Radi;
-    const { h, plugin, mount, Store, service, customTag } = RadiDevtools.attatch(Radi);
-    const Fetch = plugin(RadiFetch, {
-      baseUrl: 'https://randomuser.me/api/',
-      /* headers: {
-        'content-type': 'application/json',
-      }, */
-      dummy: false,
-      dummyTimeout: 0,
-      /* dummyTimeout: 2000, */
-      // dummyData,
-    })
+    const { h, mount, Subscribe, Store, service, customTag } = Radi;
+    // const { h, Subscribe, mount, Store, service, customTag } = RadiDevtools.attatch(Radi);
+    // const Fetch = plugin(RadiFetch, {
+    //   baseUrl: 'https://randomuser.me/api/',
+    //   /* headers: {
+    //     'content-type': 'application/json',
+    //   }, */
+    //   dummy: false,
+    //   dummyTimeout: 0,
+    //   /* dummyTimeout: 2000, */
+    //   // dummyData,
+    // })
 
-    console.dir(service.modal)
-
-    // service('router', function() {
-    //   return {
-    //     'active': true,
-    //   };
-    // });
-
-    const Interests = new Fetch(
-      '/user/:id',
-      ({interests}) => (['football', 'hockey'])
-    );
-
-    // TODO: Figure out sending to API
-    // this could ge sent from <FORM>
-    // const sendToApi = Fetch.post('/user', fields => ({
-    //   username: fields.name,
-    // }))
-
-    const User = new Fetch(
-      '/user/:id',
-      ({user}) => ({
-        id: user._key,
-        firstname: user.firstname,
-        lastname: user.lastname,
-        hobbies: user.interests,
-        interests: Interests({id: 1}),
-      })
-    );
-
-    const userState = new Store({
-      foo: 'bar',
-      user: User({id: 10}),
-    }, 'userState')
-
-
-
-
-    const portalStore = new Store({
-      show: false,
-    }, 'portalStore')
-
-    const toggle = ({show}) => ({show: !show})
-
-
-    // const getUser = (state, id) => ({user: User({id})}) // => Update user in next async action
+    // console.dir(service.modal)
     //
-    // setTimeout(() => {
-    //   userState.dispatch(getUser, 12)
-    //   userState.dispatchIn('user', getUser, 12)
-    // }, 1000)
-
-
-
-
-
-
-
-    const store = new Store({
-      rows: [],
-    }, 'Store')
-
-    const create = (state, count) => {
-      return {
-        rows: buildData(count, 0),
-      }
-    }
-
-    const remove = ({rows}, count) => {
-      return {
-        rows: count ? rows.slice(0,count) : [],
-      }
-    }
-
-    const every = ({rows}, interval) => {
-      return {
-        rows: rows.map((r, i) => (
-          !((i + 1) % interval)
-            ? { ...r, value: r.value + ' !!!' }
-            : r
-        )),
-      }
-    }
-
-    const swap = ({rows}, from, to) => {
-      const temp1 = {...(rows.slice(from, from+1)[0])}
-      const temp2 = {...(rows.slice(to, to+1)[0])}
-      rows[from] = temp2;
-      rows[to] = temp1;
-      return {
-        rows,
-      }
-    }
-
-    const reverse = ({rows}) => {
-      return {
-        rows: rows.reverse(),
-      }
-    }
-
-    const App = function() {
-      return (
-        <div>
-          <h1 style={{color: 'red'}}>Hello World</h1>
-          <button onclick={ e => store.dispatch(create, 1) }>Create 1</button>
-          <button onclick={ e => store.dispatch(create, 1000) }>Create 1k</button>
-          <button onclick={ e => store.dispatch(create, 10000) }>Create 10k</button>
-          <button onclick={ e => store.dispatch(reverse) }>reverse</button>
-          <button onclick={ e => store.dispatch(every, 10) }>every 10</button>
-          <button onclick={ e => store.dispatch(swap, 4, 9) }>swap 4,9</button>
-          <button onclick={ e => store.dispatch(remove) }>remove</button>
-          <ul>
-            {store.render(v => v.rows.map((item,n) => <li>{item.id}. {item.value}</li>))}
-          </ul>
-        </div>
-      )
-    }
+    // // service('router', function() {
+    // //   return {
+    // //     'active': true,
+    // //   };
+    // // });
+    //
+    // const Interests = new Fetch(
+    //   '/user/:id',
+    //   ({interests}) => (['football', 'hockey'])
+    // );
+    //
+    // // TODO: Figure out sending to API
+    // // this could ge sent from <FORM>
+    // // const sendToApi = Fetch.post('/user', fields => ({
+    // //   username: fields.name,
+    // // }))
+    //
+    // const User = new Fetch(
+    //   '/user/:id',
+    //   ({user}) => ({
+    //     id: user._key,
+    //     firstname: user.firstname,
+    //     lastname: user.lastname,
+    //     hobbies: user.interests,
+    //     interests: Interests({id: 1}),
+    //   })
+    // );
+    //
+    // const userState = new Store({
+    //   foo: 'bar',
+    //   user: User({id: 10}),
+    // }, 'userState')
+    //
+    //
+    //
+    //
+    // const portalStore = new Store({
+    //   show: false,
+    // }, 'portalStore')
+    //
+    // const toggle = ({show}) => ({show: !show})
+    //
+    //
+    // // const getUser = (state, id) => ({user: User({id})}) // => Update user in next async action
+    // //
+    // // setTimeout(() => {
+    // //   userState.dispatch(getUser, 12)
+    // //   userState.dispatchIn('user', getUser, 12)
+    // // }, 1000)
+    //
+    //
+    //
+    //
+    //
+    //
+    //
+    // const store = new Store({
+    //   rows: [],
+    // }, 'Store')
+    //
+    // const create = (state, count) => {
+    //   return {
+    //     rows: buildData(count, 0),
+    //   }
+    // }
+    //
+    // const remove = ({rows}, count) => {
+    //   return {
+    //     rows: count ? rows.slice(0,count) : [],
+    //   }
+    // }
+    //
+    // const every = ({rows}, interval) => {
+    //   return {
+    //     rows: rows.map((r, i) => (
+    //       !((i + 1) % interval)
+    //         ? { ...r, value: r.value + ' !!!' }
+    //         : r
+    //     )),
+    //   }
+    // }
+    //
+    // const swap = ({rows}, from, to) => {
+    //   const temp1 = {...(rows.slice(from, from+1)[0])}
+    //   const temp2 = {...(rows.slice(to, to+1)[0])}
+    //   rows[from] = temp2;
+    //   rows[to] = temp1;
+    //   return {
+    //     rows,
+    //   }
+    // }
+    //
+    // const reverse = ({rows}) => {
+    //   return {
+    //     rows: rows.reverse(),
+    //   }
+    // }
+    //
+    // const App = function() {
+    //   return (
+    //     <div>
+    //       <h1 style={{color: 'red'}}>Hello World</h1>
+    //       <button onclick={ e => store.dispatch(create, 1) }>Create 1</button>
+    //       <button onclick={ e => store.dispatch(create, 1000) }>Create 1k</button>
+    //       <button onclick={ e => store.dispatch(create, 10000) }>Create 10k</button>
+    //       <button onclick={ e => store.dispatch(reverse) }>reverse</button>
+    //       <button onclick={ e => store.dispatch(every, 10) }>every 10</button>
+    //       <button onclick={ e => store.dispatch(swap, 4, 9) }>swap 4,9</button>
+    //       <button onclick={ e => store.dispatch(remove) }>remove</button>
+    //       <ul>
+    //         {store.render(v => v.rows.map((item,n) => <li>{item.id}. {item.value}</li>))}
+    //       </ul>
+    //     </div>
+    //   )
+    // }
     //
     //
     //
@@ -323,37 +323,37 @@
     //   )
     // }
 
-    /* Firstly we define state */
+    const Position = new Subscribe().on('mousemove', ({x, y}) => ({x, y}))
+    const Pressed = new Subscribe().on('mousedown mouseup', (e, name) => ({pressed: name === 'mousedown'}))
+
+    const tracker = new Store({
+      position: Position({x: 0, y: 0}),
+      pressed: Pressed({pressed: false}).map(e => e.pressed),
+    })
+
+    tracker.subscribe(({pressed}) => (
+      pressed
+        ? Position.start()
+        : Position.stop()
+    ))
+
+
+    const person = new Store({
+      name: 'John',
+    }).map(({name}) => ({name, surname: name}))
+
+    /* Firstly we define store with initial state */
     const counter = new Store({
       count: 0,
       color: 0,
-      user: userState(),
-    }, 'Counter')
+      person,
+      tracker,
+    })
 
     /* Then we define some actions that will change state */
-    const color = ({color}, by) => ({color: (color + by) % 360})
-    const up = ({count}, by) => ({count: count + by})
-    const down = ({count}, by) => ({count: count - by})
-
-    /* Then comes pure function component */
-    function Counter() {
-      // this.onMount = () => {console.log('I got mounted')}
-      return (
-        <div>
-          <pre class={counter(({user}) => [
-            1,
-            !user.$loading && 'user-name',
-            2,
-          ])}>{ counter(({user}) => (user.user && !user.user.$loading) ? JSON.stringify(user) : 'Loading..') }</pre>
-          <div>User: { counter(({user}) => (user.user && !user.user.$loading) ? 'Done!' : 'Loading..') }</div>
-          <div>Interests: { counter(({user}) => ((user.user && user.user.interests && !user.user.interests.$loading) ? 'Done!' : 'Loading..')) }</div>
-          <h1 style={{background: 'orange', color: counter(({color}) => 'hsl('+color+', 100%, 50%)')}}>{ counter(s => <i class={counter(({color}) => 'hsl('+color+', 100%, 50%)')}>{s.count}</i>) }</h1>
-          <button onclick={ () => counter.dispatch(color, 10) }>Color</button>
-          <button onclick={ () => counter.dispatch(up, 1) }>Up</button>
-          <button onclick={ () => counter.dispatch(down, 1) }>Down</button>
-        </div>
-      )
-    }
+    const upAction = ({count}, by) => ({count: count + by})
+    const downAction = ({count}, by) => ({count: count - by})
+    const changeNameAction = (_, name) => ({name})
 
     const fade = {
       in: (el) => el.animate({
@@ -373,79 +373,44 @@
       }).onfinish = done,
     };
 
-    function ModalHolder() {
-      // service.modal.onOpen('asd', () => {
-      //   console.log('Opened modal `asd`')
-      // })
-      // service.modal.onClose('asd', () => {
-      //   console.log('Closed modal `asd`')
-      // })
-      return <div>
-        <div>
-          <modal name="asd">
-            <h1>I am modal</h1>
-          </modal>
-        </div>
-        <button onclick={ e => service.modal.open('asd') }>Open</button>
-        <button onclick={ e => service.modal.close('asd') }>Close</button>
-      </div>
-    }
-
-    // console.log(counter.bind('count'))
-
-const toString = s => JSON.stringify(s);
-const toJSON = s => JSON.parse(s);
-
-    const JsonStore = new Store({
-      playground: {},
-    })
-
-    function WriteJson() {
+    /* Then we define pure functional component */
+    function Counter({
+      // count = counter().count,
+      count = counter('count'),
+      personData = counter().person,
+      trackerData = counter().tracker,
+      up = counter.willDispatch(upAction, 1),
+      down = counter.willDispatch(downAction, 1),
+      changeName = person.willDispatch(changeNameAction),
+    }) {
+      // <h1 animation={{
+      //   in: fade.in,
+      //   out: fade.out,
+      // }}>{ count }</h1>
       return (
         <div>
-          <pre>{JsonStore(store => JSON.stringify(store.playground))}</pre>
-          <textarea {...JsonStore.bind('playground', toString, toJSON)}></textarea>
+          <h1>{ JSON.stringify(personData) }</h1>
+          <h1>{ JSON.stringify(trackerData) }</h1>
+          <h1>{ count }</h1>
+          <pre html="<b>ad</b>"></pre>
+          <button onclick={ up }>Up</button>
+          <button onclick={ down } disabled={ count <= 0 }>Down</button>
+          <button onclick={ e => changeName('Jane') }>Change Name</button>
         </div>
       )
     }
 
-    // mount(
-    //   // Counter,
-    //   // <Sinwave/>,
-    //   <div>
-    //     <input type="text" {...counter.bind('user', e => JSON.stringify(e), e => JSON.parse(e))}/>
-    //     <div>
-    //       <WriteJson></WriteJson>
-    //     </div>
-    //     portal
-    //     { portalStore(({show}) => show && <portal to={document.body}><input type="text" loadfocus/><ul><li>1</li><li>1</li><li>1</li>John Doe</ul></portal>) }
-    //     { portalStore(({show}) => show && [
-    //       <h1 animation={{
-    //         in: fade.in,
-    //         out: fade.out,
-    //       }}>Hello <i>Animation 1</i></h1>,
-    //       <h1 animation={ fade }>Hello <i>Animation 2</i></h1>,
-    //       <h1 animation={ fade }>Hello <i>Animation 3</i></h1>,
-    //     ]) }
-    //     <ModalHolder/>
-    //     <pre escape html="<h1>asd</h1>"></pre>
-    //     <button onclick={e => portalStore.dispatch(toggle)}>toggle</button>
-    //     <Counter/>
-    //   </div>,
-    //   // <h1><Counter/></h1>,
-    //   // <h2>Hello World</h2>,
-    //   // [1,2,3],
-    //   // [1, clock.render(v => [2, v.time, 3]), 4],
-    //   app
-    // );
+    /* Test by just passing prop to that function */
+    // console.log(Counter({ count: 99 }).children[0].children[0] === 99);
+
+    /* Same for actions */
+    // console.log(upAction({ count: 1 }, 5).count === 6);
+
+    /* In the end just mount component to dom */
     mount(
-      // Counter,
-      // <Sinwave/>,
-      <App/>,
-      // <h1><Counter/></h1>,
-      // <h2>Hello World</h2>,
-      // [1,2,3],
-      // [1, clock.render(v => [2, v.time, 3]), 4],
+      <div>
+        <Counter/>
+      </div>,
       app
     );
 
